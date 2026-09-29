@@ -7,6 +7,7 @@ import threading
 import traceback
 import logging
 import sqlite3
+import copy
 import json
 import os
 
@@ -53,23 +54,24 @@ class MinervaApp(BaseApp):
             user_exact_length=True    # Habilita o botão apenas com exatos 11 dígitos
         )
         super().__init__(cfg)
-        
-        self.siafeVersao = 1             # 1 = Prod | 2 = Beta
-        
+
+        self.siafeVersao = 1              # 1 = Prod | 2 = Beta
+
         self.DBPath = self.cfg.base_path / "base de dados" / "DAF.db"
         self.DAFPath = self.cfg.base_path / "DAF.py"
-        
+
         self.siafe = Siafe()             # controla o navegador/sessão do siafe
         self.stop_event = False          # vira True quando o usuário cancela a rotina
         self.opcao_selecionada = None    # tipo de contabilização escolhido no combo
-        
+        self.retorno_automatico = True   # se True, volta sozinho pra tela anterior ao terminar
+
         self.graph = None                # GraphAPI; definido em __main__ após configurar_log
         self.dev_emails = []             # destinatários do e-mail de erro
         self.teams_webhook = None        # webhook do Teams (opcional)
         self.erros_acumulados = []       # falhas críticas da sessão; resumo enviado ao fechar
-        
+
         self.show_login_frame(on_success=lambda u, s: self.show_config_frame())
-        
+
     def _enviar_resumo_erros(self):
         """Envia, uma única vez ao fechar, um resumo dos erros da sessão por e-mail e/ou Teams."""
         # sem graph configurado ou sem erros, não há o que enviar
@@ -112,12 +114,12 @@ class MinervaApp(BaseApp):
     def cancelar_e_voltar(self):
         """Cancela a execução e retorna ao menu de configuração"""
         self.stop_event = True
-        try: 
+        try:
             if self.siafe.driver:
                 self.siafe.fechar_driver()
         except: pass
         self.show_config_frame()
-        
+
     def limpar_recursos(self):
         """Hook para encerramento limpo da aplicação (botão fechar)"""
         self.stop_event = True
@@ -132,23 +134,23 @@ class MinervaApp(BaseApp):
     def show_config_frame(self):
         self.clear_frame()
         self.create_menu()
-        
+
         self.add_back_button(lambda: self.show_login_frame(on_success=lambda u, s: self.show_config_frame()))
         self._add_logo()
-        
+
         self.make_header_label("Minerva", pady=(20, 5))
         self.make_subtitle_label("Menu Principal", pady=(0, 20))
 
         # --- ÁREA 1: ATUALIZAÇÃO DE BASE (DAF) ---
         frame_daf = self.make_section_frame()
-        
+
         self.btn_daf = self.make_primary_button(
-            frame_daf, 
-            text="PROCESSAR DAF", 
+            frame_daf,
+            text="PROCESSAR DAF",
             command=self.iniciar_daf_thread
         )
         self.btn_daf.pack(pady=(5, 15))
-        
+
         self.make_primary_button(
             frame_daf, text="BANCO DE DADOS",
             command=lambda: self.mostrar_pendentes_popup("Programa Minerva", tipo_ids)
@@ -156,22 +158,22 @@ class MinervaApp(BaseApp):
 
         # --- ÁREA 2: CONTABILIZAÇÃO (Siafe) ---
         frame_contab = self.make_section_frame()
-        
+
         ctk.CTkLabel(frame_contab, text="Tipo de Contabilização:", font=self.font_bold).pack(pady=(5, 5))
         self.combo_opcoes = ctk.CTkComboBox(
-            frame_contab, values=["Receita (GR)", "PASEP (PD)"], 
+            frame_contab, values=["Receita (GR)", "PASEP (PD)"],
             width=250, height=35, command=self.validar_selecao
         )
         self.combo_opcoes.set("Selecione uma opção")
         self.combo_opcoes.pack(pady=5)
 
         self.btn_contab = self.make_success_button(
-            frame_contab, 
-            text="CONTABILIZAR", 
+            frame_contab,
+            text="CONTABILIZAR",
             command=self.iniciar_execucao
         )
         self.btn_contab.pack(pady=20)
-        
+
         self.btn_contab.configure(state="disabled", fg_color=self.cfg.color_disabled)
         self._add_footer()
 
@@ -202,12 +204,12 @@ class MinervaApp(BaseApp):
                 query = '''UPDATE contabilizacoes SET num_documento = ?, usuario_contab = ?, data_hora_contab = ?, tempo_contab = ? WHERE id = ?'''
                 cursor.execute(query, (num_documento, os.getlogin(), str(pd.Timestamp.now()), tempo_contab, id))
                 con.commit()
-                
+
             self.registros_processados += 1
-            valor_barra = self.registros_processados / self.total_registros 
-               
+            valor_barra = self.registros_processados / self.total_registros
+
             self.update_progress(valor_barra)
-            
+
         except Exception:
             logger.error(f"Erro ao atualizar banco ID {id}", exc_info=True)
 
@@ -219,18 +221,20 @@ class MinervaApp(BaseApp):
                 logger.error("Banco de dados não encontrado.", exc_info=True)
                 return
 
+            dict_map = {}
+            via_api = False
+
             with sqlite3.connect(self.DBPath) as con:
                 if "Receita (GR)" in self.opcao_selecionada:
                     df = pd.read_sql_query("SELECT * FROM contabilizacoes WHERE num_documento IS NULL AND tipo_id IN (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 21)", con)
-                    dict_map     = dicts.dict_map_gr
-                    metodo_siafe = self.siafe.gerar_documento
-                    documento    = self.siafe.gerar_GR
+                    dict_map     = dicts.dict_map_gr_API
+                    documento    = self.siafe.gerar_GR_API
                     tipo_doc     = "Guia de Recolhimento"
-                    
+                    via_api      = True
+
                 elif "PASEP (PD)" in self.opcao_selecionada:
                     df = pd.read_sql_query("SELECT * FROM contabilizacoes WHERE num_documento IS NULL AND tipo_id IN (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22)", con)
                     dict_map     = dicts.dict_map_pd
-                    metodo_siafe = self.siafe.gerar_documento
                     documento    = self.siafe.gerar_PDT
                     tipo_doc     = "PD de Transferência"
                 else:
@@ -246,33 +250,49 @@ class MinervaApp(BaseApp):
             logger.info(f"{len(df)} registros encontrados.")
             self.total_registros = len(df)
             self.registros_processados = 0
-            
+
             self.reset_progress()
 
-            self.siafe.abrir_driver()
-            logger.info("Iniciando navegador.")
-            
-            if self.stop_event: return
-
-            logger.info("Iniciando Contabilização.")
-            if self.siafe.logar_siafe(self.siafeVersao, self._usuario, self._senha):
-
-                sucesso = metodo_siafe(documento, df, dict_map, callback_sucesso=self.atualizar_banco)
-
-                if sucesso:
-                    logger.info(">>> Processo concluído com Sucesso! <<<")
-                    self.finalize_progress("Processado... (100%)", "Sucesso", f"{tipo_doc} contabilizadas com sucesso!", "info")
-
+            # faz o login: via api quando for GR, senão abre o navegador de verdade
+            if via_api:
+                logado = self.siafe.logar_siafe_API(self.siafeVersao, self._usuario, self._senha)
             else:
+                logger.info("Iniciando navegador")
+                self.siafe.abrir_driver()
+
+                if self.stop_event: return
+
+                logger.info("Iniciando Contabilização")
+                logado = self.siafe.logar_siafe(self.siafeVersao, self._usuario, self._senha)
+
+            # login falhou: limpa credenciais e devolve o usuário pra tela de login
+            if not logado:
                 logger.warning("Falha no login. Verifique suas credenciais.")
                 self.stop_event = True
-                self.siafe.fechar_driver()
-                
+                self.retorno_automatico = False
+                if hasattr(self, 'siafe') and self.siafe.driver:
+                    self.siafe.fechar_driver()
+
                 def fechar_e_voltar():
                     self.finalize_progress(label="Falha no Login")
+                    self._usuario = ""
+                    self._senha = ""
                     self.show_login_frame(on_success=lambda u, s: self.show_config_frame())
                 self.after(0, fechar_e_voltar)
                 return
+
+            # gera os documentos no siafe; a cada sucesso, atualizar_banco é chamado
+            # deepcopy pra cada rodada não sujar o dicionário original
+            sucesso = self.siafe.gerar_documento(
+                funcao=documento,
+                df=df,
+                dict_map=copy.deepcopy(dict_map),
+                callback_sucesso=self.atualizar_banco
+            )
+
+            if sucesso:
+                logger.info(">>> Processo concluído com Sucesso! <<<")
+                self.finalize_progress("Processado... (100%)", "Sucesso", f"{tipo_doc} contabilizadas com sucesso!", "info")
 
         except (NoSuchElementException, SessionNotCreatedException, InvalidSessionIdException):
             if self.stop_event: return
@@ -288,11 +308,15 @@ class MinervaApp(BaseApp):
             self.after(0, self.mostrar_pendentes_popup("Programa Minerva", tipo_ids))
             if not self.stop_event:
                 logger.info("Fechando navegador.")
-            if hasattr(self, 'siafe') and self.siafe.driver:
-                self.siafe.fechar_driver()
-            
-            self.after(5000, self.show_config_frame)
-            logger.info("Programa encerrado. Retornando ao menu principal.")
+
+            try:
+                if hasattr(self, 'siafe') and self.siafe.driver:
+                    self.siafe.fechar_driver()
+            except: pass
+
+            if self.retorno_automatico:
+                self.after(5000, self.show_config_frame)
+                logger.info("Programa encerrado. Retornando ao menu principal.")
 
     # =========================================================================
     # POPUP: CONTABILIZAÇÕES PENDENTES
@@ -301,15 +325,15 @@ class MinervaApp(BaseApp):
 
         # constrói e exibe o popup de consulta ao banco (código em tela_db.py)
         # programa_nome/tipo_ids definem a visão inicial (contabilizados do programa atual)
-        construir_tela_db(self, programa_nome, tipo_ids) 
+        construir_tela_db(self, programa_nome, tipo_ids)
 
 if __name__ == "__main__":
     app = MinervaApp()
-    
+
     pasta_erros = Path(__file__).parent / "logs"
     pasta_geral = fr"\\cifs-zone1\tesouro\Programas da SUPCONC\logs\Programa Minerva"
     caminho_geral, caminho_erros = configurar_log("Programa Minerva", pasta_geral, pasta_erros, callback_interface=app.log)
-    
+
     # Coleta automática de todo logger.error() (do app e da biblioteca) para o resumo enviado ao fechar
     logging.getLogger("jupiter").addHandler(ColetorErros(app.erros_acumulados))
 
