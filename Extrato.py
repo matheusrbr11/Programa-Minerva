@@ -88,7 +88,7 @@ def processar_arquivos_csv(pasta_raiz: str):
     def _processar_dia(data_dia: str, df_dia: pd.DataFrame) -> list:
         anp_7990, anp_9478, anp_7990E, anp_9478E, pea, fep, iso = [], [], [], [], [], [], []
         fpe, ipi, cfm, cid, ado, cfh = [], [], [], [], [], []
-        pasep_fpe, pasep_ipi, pasep_cfm, pasep_cid, pasep_ado, pasep_cfh, pasep_iso = [], [], [], [], [], [], []
+        pasep_pea, pasep_fep, pasep_fpe, pasep_ipi, pasep_cfm, pasep_cid, pasep_ado, pasep_cfh, pasep_iso = [], [], [], [], [], [], [], [], []
         
         grupo = None
         retencao_pasep = None
@@ -101,7 +101,13 @@ def processar_arquivos_csv(pasta_raiz: str):
             valor_decimal = row['valor_decimal']
             
             if parcela == 'RETENCAO PASEP' and grupo is None:
-                retencao_pasep = (valor_decimal, row['fundo'])
+                fundo = str(row['fundo'])
+                if fundo.startswith('FEP'):
+                    pasep_fep.append(valor_decimal)
+                elif fundo.startswith('PEA'):
+                    pasep_pea.append(valor_decimal)
+                else:
+                    retencao_pasep = (valor_decimal, row['fundo'])
                 continue
             if parcela == 'PASEP ESTADO' and grupo is None:
                 pasep_estado = (valor_decimal, row['fundo'])
@@ -171,6 +177,15 @@ def processar_arquivos_csv(pasta_raiz: str):
                 if pasep_valor > 0:
                     lancamentos.append({'data': data_dia, 'valor': pasep_valor, 'tipo_id': pasep_tipo_id})
 
+        def _add_retido(valor_principal: list, tipo_id: int, valor_pasep: list, pasep_tipo_id: int):
+            # PASEP = soma das retenções do DAF (só lança se houver o principal no dia)
+            valor_sum = sum(valor_principal)
+            if valor_sum > 0:
+                lancamentos.append({'data': data_dia, 'valor': valor_sum, 'tipo_id': tipo_id})
+                pasep_sum = sum(valor_pasep)
+                if pasep_sum > 0:
+                    lancamentos.append({'data': data_dia, 'valor': pasep_sum, 'tipo_id': pasep_tipo_id})
+
         def _add_outro(valor_principal: list, tipo_id: int, valor_pasep: list, pasep_tipo_id: int):
             valor_sum = sum(valor_principal)
             if valor_sum > 0:
@@ -183,8 +198,8 @@ def processar_arquivos_csv(pasta_raiz: str):
         _add_royalty(anp_9478, 2, Decimal('0.01'), 12)
         _add_royalty(anp_7990E, 1, Decimal('0.0075'), 11)
         _add_royalty(anp_9478E, 2, Decimal('0.01'), 12)
-        _add_royalty(pea, 3, Decimal('0.01'), 13)
-        _add_royalty(fep, 4, Decimal('0.01'), 14)
+        _add_retido(pea, 3, pasep_pea, 13)
+        _add_retido(fep, 4, pasep_fep, 14)
         
         _add_outro(fpe, 5, pasep_fpe, 15)
         _add_outro(ipi, 6, pasep_ipi, 16)
