@@ -1784,8 +1784,8 @@ dictPD_PASEP_ROYALTIES_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -1956,8 +1956,8 @@ dictPD_PASEP_FPE_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2128,8 +2128,8 @@ dictPD_PASEP_IPI_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2300,8 +2300,8 @@ dictPD_PASEP_CFM_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2472,8 +2472,8 @@ dictPD_PASEP_CFH_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2644,8 +2644,8 @@ dictPD_PASEP_CIDE_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2816,8 +2816,8 @@ dictPD_PASEP_ADO_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
@@ -2988,8 +2988,8 @@ dictPD_PASEP_ISO_API = {
             }
         ],
         "domicilioBancario": {
-            "bancoCodigo": "237",
-            "agenciaCodigo": "6898",
+            "bancoCodigo": "001",
+            "agenciaCodigo": "2234",
             "codigo": "BCO AUTENT"
         }
     },
