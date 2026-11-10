@@ -234,9 +234,10 @@ class MinervaApp(BaseApp):
 
                 elif "PASEP (PD)" in self.opcao_selecionada:
                     df = pd.read_sql_query("SELECT * FROM contabilizacoes WHERE num_documento IS NULL AND tipo_id IN (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22)", con)
-                    dict_map     = dicts.dict_map_pd
-                    documento    = self.siafe.gerar_PDT
+                    dict_map     = dicts.dict_map_pd_API
+                    documento    = self.siafe.gerar_PDT_API
                     tipo_doc     = "PD de Transferência"
+                    via_api      = True
                 else:
                     logger.warning("Opção inválida.")
                     return
